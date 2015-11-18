@@ -8,9 +8,10 @@ module OmniAuth
 
       include OmniAuth::Strategy
 
-      args [:secret]
+      args [:encode_key, :decode_key]
 
-      option :secret, nil
+      option :encode_key, nil
+      option :decode_key, nil
       option :algorithm, 'HS256'
       option :uid_claim, 'email'
       option :required_claims, %w(name email)
@@ -20,11 +21,11 @@ module OmniAuth
       option :claims_token, { "redirect_destination" => "/" }
 
       def request_phase
-        redirect "#{options.auth_url}?claims_token=#{::JWT.encode(options.claims_token, 'RSA_PRIVATE')}"
+        redirect "#{options.auth_url}?claims_token=#{::JWT.encode(options.claims_token, OpenSSL::PKey::RSA.new(options.encode_key), options.algorithm)}"
       end
 
       def decoded
-        @decoded ||= ::JWT.decode(request.params['jwt'], options.secret, options.algorithm)
+        @decoded ||= ::JWT.decode(request.params['jwt'], OpenSSL::PKey::RSA.new(options.decode_key), true, algorithm: options.algorithm)
         (options.required_claims || []).each do |field|
           raise ClaimInvalid.new("Missing required '#{field}' claim.") if !@decoded.key?(field.to_s)
         end
